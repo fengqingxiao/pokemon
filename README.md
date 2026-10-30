@@ -4,7 +4,7 @@
 
 ## 在线试玩
 
-**https://fengqingxiao.github.io/bkm/**
+**https://fengqingxiao.github.io/pokemon/**
 
 - 移动：方向键 / WASD / 屏幕方向键
 - 交互：Z / 空格 / 回车 / 屏幕 A 键
