@@ -17,7 +17,7 @@ import { GameState } from '../engine/state';
 import { MessageBox } from '../ui/messageBox';
 import { createTouchControls, type TouchInput } from '../ui/touch';
 
-const DEFAULT_MAP = 900;
+const DEFAULT_MAP = 56;
 const PLAYER_CHARSET = 'trainer_POKEMONTRAINER_Red';
 const STEP_ANIME_MS = 125;
 
