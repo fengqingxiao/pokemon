@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>tileset sheet</title>
+    <style>
+      body { margin: 0; background: #111; color: #eee; font: 12px/1.3 monospace; }
+      #meta { padding: 6px 10px; white-space: pre; }
+      canvas { display: block; image-rendering: pixelated; max-width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="meta">loading…</div>
+    <canvas id="sheet"></canvas>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const tilesetId = Number(q.get('tileset') || 17);
+      const usedFrom = Number(q.get('usedFrom') || 0);
+      const offset = Number(q.get('offset') || 0);
+      const count = Number(q.get('count') || 48);
+      const scale = Number(q.get('scale') || 3);
+      const cellsPerRow = Number(q.get('cols') || 4);
+
+      const b64ToInt16 = (b64) => {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Int16Array(bytes.buffer);
+      };
+
+      const loadImg = (src) =>
+        new Promise((res, rej) => {
+          const i = new Image();
+          i.onload = () => res(i);
+          i.onerror = () => rej(new Error('img ' + src));
+          i.src = src;
+        });
+
+      (async () => {
+        const tilesets = await (await fetch('/data/tilesets.json')).json();
+        const ts = tilesets[tilesetId];
+        const passages = b64ToInt16(ts.passages);
+        const priorities = b64ToInt16(ts.priorities);
+        const tags = b64ToInt16(ts.terrainTags);
+
+        let ids;
+        if (usedFrom) {
+          const map = await (await fetch('/data/maps/' + usedFrom + '.json')).json();
+          const data = b64ToInt16(map.data);
+          const counts = new Map();
+          for (const v of data) if (v) counts.set(v, (counts.get(v) || 0) + 1);
+          ids = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id, n]) => ({ id, n }));
+        } else {
+          ids = Array.from({ length: 2000 }, (_, i) => ({ id: 384 + i, n: 0 }));
+        }
+        const page = ids.slice(offset, offset + count);
+
+        const sheet = await loadImg('/assets/Graphics/Tilesets/' + ts.image + '.png');
+        const cell = 32 * scale;
+        const labelH = 26;
+        const rows = Math.ceil(page.length / cellsPerRow);
+        const canvas = document.getElementById('sheet');
+        canvas.width = cellsPerRow * cell;
+        canvas.height = rows * (cell + labelH) + 8;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        page.forEach((item, i) => {
+          const cx = (i % cellsPerRow) * cell;
+          const cy = Math.floor(i / cellsPerRow) * (cell + labelH);
+          const id = item.id;
+          if (id >= 384) {
+            const n = id - 384;
+            const sx = (n % 8) * 32;
+            const sy = Math.floor(n / 8) * 32;
+            ctx.drawImage(sheet, sx, sy, 32, 32, cx, cy, cell, cell);
+          } else {
+            ctx.fillStyle = '#223';
+            ctx.fillRect(cx, cy, cell, cell);
+            ctx.fillStyle = '#889';
+            ctx.font = '10px monospace';
+            ctx.fillText('auto ' + (Math.floor(id / 48) - 1), cx + 6, cy + cell / 2);
+          }
+          ctx.strokeStyle = '#333';
+          ctx.strokeRect(cx + 0.5, cy + 0.5, cell - 1, cell - 1);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText('#' + id + (item.n ? ' x' + item.n : ''), cx + 2, cy + cell + 11);
+          ctx.fillStyle = '#7cf';
+          ctx.font = '10px monospace';
+          const p = (passages[id] ?? 0).toString(16).padStart(2, '0');
+          ctx.fillText('p' + (priorities[id] ?? 0) + ' t' + (tags[id] ?? 0) + ' 0x' + p, cx + 2, cy + cell + 23);
+        });
+
+        document.getElementById('meta').textContent =
+          'tileset ' + tilesetId + ' ' + ts.name + ' | image ' + ts.image +
+          ' | autotiles ' + (ts.autotiles || []).filter(Boolean).join(' / ') +
+          ' | showing ' + offset + '..' + (offset + page.length) + ' of ' + ids.length;
+      })().catch((e) => {
+        document.getElementById('meta').textContent = 'ERR ' + e.message;
+      });
+    </script>
+  </body>
+</html>

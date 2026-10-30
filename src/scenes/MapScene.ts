@@ -17,7 +17,7 @@ import { GameState } from '../engine/state';
 import { MessageBox } from '../ui/messageBox';
 import { createTouchControls, type TouchInput } from '../ui/touch';
 
-const DEFAULT_MAP = 56;
+const DEFAULT_MAP = 900;
 const PLAYER_CHARSET = 'trainer_POKEMONTRAINER_Red';
 const STEP_ANIME_MS = 125;
 
@@ -59,6 +59,7 @@ export class MapScene extends Phaser.Scene {
   private ready = false;
   private unsupported = 0;
   private lastTouchDir: number | null = null;
+  private touchLatch?: string;
 
   constructor() {
     super('map');
@@ -258,6 +259,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private canStepPlayer(x: number, y: number, dir: number): boolean {
+    if (x < 0 || y < 0 || x >= this.map.width || y >= this.map.height) return false;
     return playerPassable(this.tileset, this.tags, this.map, x, y, dir) && !this.blocked(x, y);
   }
 
@@ -351,9 +353,29 @@ export class MapScene extends Phaser.Scene {
     if (entry && !page.directionFix) {
       entry.directionOverride = { 2: 8, 4: 6, 6: 4, 8: 2 }[this.player.direction] ?? page.graphic.direction;
     }
-    await this.interpreter.run(page.list, ev.id);
+    await this.runPage(ev.id, page);
+  }
+
+  private async runPage(eventId: number, page: EventPage): Promise<void> {
+    await this.interpreter.run(page.list, eventId);
     this.refreshEventSprites();
     this.updateHud();
+  }
+
+  /** RGSS "player touch" trigger: fires when the player steps onto the event tile. */
+  private async checkTouchTrigger(): Promise<void> {
+    if (this.interpreter.isRunning || this.player.moving) return;
+    const key = `${this.player.tileX},${this.player.tileY}`;
+    const ev = this.map.events.find((e) => e.x === this.player.tileX && e.y === this.player.tileY && !this.erased.has(e.id));
+    if (!ev) {
+      this.touchLatch = undefined;
+      return;
+    }
+    const page = this.activePage(ev);
+    if (!page || page.trigger !== 1) return;
+    if (this.touchLatch === `${ev.id}@${key}`) return;
+    this.touchLatch = `${ev.id}@${key}`;
+    await this.runPage(ev.id, page);
   }
 
   update(time: number, delta: number): void {
@@ -408,6 +430,7 @@ export class MapScene extends Phaser.Scene {
     this.syncEventSprites(time);
     this.mapView.update(this.cameras.main.worldView, time);
     this.updateHud();
+    void this.checkTouchTrigger();
   }
 
   /** Events with an autonomous "random" move route wander on the 32px grid. */

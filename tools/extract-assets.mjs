@@ -93,8 +93,10 @@ for (const p of paths) args.push('--include', p);
 execFileSync('bsdtar', args, { stdio: 'inherit' });
 
 const audioManifest = {};
+const audioPath = `${DATA}/audio.json`;
+if (fs.existsSync(audioPath)) Object.assign(audioManifest, JSON.parse(fs.readFileSync(audioPath, 'utf8')));
 for (const [rel, actual] of Object.entries(manifest)) {
   if (rel.startsWith('Audio/')) audioManifest[rel.replace(/^Audio\//, '')] = actual;
 }
-fs.writeFileSync(`${DATA}/audio.json`, JSON.stringify(audioManifest));
+fs.writeFileSync(audioPath, JSON.stringify(audioManifest));
 console.log(`extracted into ${OUT}; audio entries ${Object.keys(audioManifest).length}`);
