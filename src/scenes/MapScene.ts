@@ -60,6 +60,7 @@ export class MapScene extends Phaser.Scene {
   private unsupported = 0;
   private lastTouchDir: number | null = null;
   private touchLatch?: string;
+  private loading = false;
 
   constructor() {
     super('map');
@@ -315,18 +316,24 @@ export class MapScene extends Phaser.Scene {
   }
 
   private async transferTo(mapId: number, x: number, y: number, dir: number): Promise<void> {
-    if (!mapId) return;
-    const cam = this.cameras.main;
-    cam.fadeOut(180, 0, 0, 0);
-    await new Promise<void>((resolve) => setTimeout(resolve, 190));
-    await this.loadMap(mapId);
-    this.player.placeAt(x, y);
-    if ([2, 4, 6, 8].includes(dir)) this.player.direction = dir;
-    this.applyPlayerSprite();
-    cam.setBounds(0, 0, this.map.width * TILE, this.map.height * TILE);
-    cam.fadeIn(180, 0, 0, 0);
-    this.audio.playBgm(this.map.bgm?.name ?? '', this.map.bgm?.volume ?? 100, this.map.bgm?.pitch ?? 100);
-    this.updateHud();
+    if (!mapId || this.loading) return;
+    this.loading = true;
+    try {
+      const cam = this.cameras.main;
+      cam.fadeOut(180, 0, 0, 0);
+      await new Promise<void>((resolve) => setTimeout(resolve, 190));
+      await this.loadMap(mapId);
+      this.player.placeAt(x, y);
+      if ([2, 4, 6, 8].includes(dir)) this.player.direction = dir;
+      this.applyPlayerSprite();
+      cam.setBounds(0, 0, this.map.width * TILE, this.map.height * TILE);
+      this.audio.playBgm(this.map.bgm?.name ?? '', this.map.bgm?.volume ?? 100, this.map.bgm?.pitch ?? 100);
+      this.updateHud();
+      cam.fadeIn(180, 0, 0, 0);
+    } finally {
+      this.touchLatch = undefined;
+      this.loading = false;
+    }
   }
 
   private waitForAction(): Promise<ActionKind> {
@@ -379,7 +386,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
-    if (!this.ready) return;
+    if (!this.ready || this.loading) return;
 
     const actionPressed =
       Phaser.Input.Keyboard.JustDown(this.keys.Z) ||

@@ -100,7 +100,9 @@ export class MapView {
       const canvas = document.createElement('canvas');
       canvas.width = CHUNK_PX;
       canvas.height = TILE_SIZE;
-      const tex = this.scene.textures.addCanvas(`map_s_${chunk.key}_${key}`, canvas)!;
+      const texKey = `map_s_${chunk.key}_${key}`;
+      if (this.scene.textures.exists(texKey)) this.scene.textures.remove(texKey);
+      const tex = this.scene.textures.addCanvas(texKey, canvas)!;
       const img = this.scene.add
         .image(chunk.cx * CHUNK_PX, (chunk.cy * CHUNK_TILES + ty) * TILE_SIZE, tex)
         .setOrigin(0)
@@ -176,7 +178,9 @@ export class MapView {
     const key = `${cx},${cy}`;
     const groundCanvas = document.createElement('canvas');
     groundCanvas.width = groundCanvas.height = CHUNK_PX;
-    const groundTex = this.scene.textures.addCanvas(`map_g_${key}`, groundCanvas)!;
+    const groundKey = `map_g_${key}`;
+    if (this.scene.textures.exists(groundKey)) this.scene.textures.remove(groundKey);
+    const groundTex = this.scene.textures.addCanvas(groundKey, groundCanvas)!;
     const groundImg = this.scene.add.image(cx * CHUNK_PX, cy * CHUNK_PX, groundTex).setOrigin(0).setDepth(0);
     const chunk: Chunk = {
       key,
